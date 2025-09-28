@@ -2,7 +2,7 @@ streamlit
 openai
 gTTS
 SpeechRecognition
-pyaudio
+sounddevice
 python-dotenv
 flask
 requests
