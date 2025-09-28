@@ -3,6 +3,8 @@ openai
 gTTS
 SpeechRecognition
 sounddevice
+pyaudio
 python-dotenv
 flask
 requests
+
