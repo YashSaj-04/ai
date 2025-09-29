@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify
 import json
 import os
 from datetime import datetime
-import requests
+from openai import OpenAI
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -12,9 +12,14 @@ app = Flask(__name__)
 
 # Configuration - From .env file
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 CHAT_HISTORY_FILE = "chat_history.json"
 SITE_URL = os.getenv("SITE_URL", "https://ai-1-itlj.onrender.com")
+
+# Initialize OpenAI client for OpenRouter
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=OPENAI_API_KEY,
+)
 
 # Emergency keywords
 EMERGENCY_KEYWORDS = [
@@ -46,7 +51,7 @@ def detect_emergency(text):
     return any(keyword.lower() in text.lower() for keyword in EMERGENCY_KEYWORDS)
 
 def get_gpt_response(user_input, chat_history):
-    """Get response from OpenRouter API with better error handling"""
+    """Get response from OpenRouter API using OpenAI library"""
     messages = [{"role": "system", "content": "You are a friendly healthcare assistant who can speak English, Hindi, and Punjabi. Provide helpful health advice but always remind users to consult doctors for serious issues. Keep responses concise and caring."}]
     
     # Add last 6 messages for context
@@ -59,70 +64,40 @@ def get_gpt_response(user_input, chat_history):
     messages.append({"role": "user", "content": user_input})
 
     try:
-        headers = {
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": SITE_URL,
-            "X-Title": "Healthcare Assistant"
-        }
-
-        payload = {
-            "model": "meta-llama/llama-3.1-8b-instruct:free",
-            "messages": messages,
-            "temperature": 0.7,
-            "max_tokens": 400
-        }
-
         print(f"🔄 Sending request to OpenRouter...")
         print(f"🌐 Site: {SITE_URL}")
-        print(f"🔑 Key: {OPENAI_API_KEY[:20]}...")
+        print(f"🔑 Key: {OPENAI_API_KEY[:20] if OPENAI_API_KEY else 'NOT SET'}...")
         
-        response = requests.post(
-            OPENAI_API_URL, 
-            headers=headers, 
-            json=payload, 
-            timeout=30
+        completion = client.chat.completions.create(
+            extra_headers={
+                "HTTP-Referer": SITE_URL,
+                "X-Title": "Healthcare Assistant"
+            },
+            model="openai/gpt-4o-mini",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=400
         )
-
-        print(f"📊 Status: {response.status_code}")
-        print(f"📝 Response: {response.text[:500]}")
-
-        if response.status_code == 200:
-            data = response.json()
-            return data["choices"][0]["message"]["content"].strip()
         
-        elif response.status_code == 401:
-            print("❌ Invalid API Key")
-            return "⚠️ API authentication failed. Please check your OpenRouter API key."
+        response_text = completion.choices[0].message.content.strip()
+        print(f"✅ Success! Response: {response_text[:100]}...")
+        return response_text
         
-        elif response.status_code == 402:
-            print("❌ No credits")
-            return "⚠️ API credits exhausted. Please add credits to your OpenRouter account."
-        
-        elif response.status_code == 429:
-            print("❌ Rate limit")
-            return "⚠️ Too many requests. Please wait a moment and try again."
-        
-        else:
-            try:
-                error_data = response.json()
-                error_msg = error_data.get("error", {}).get("message", response.text[:200])
-            except:
-                error_msg = response.text[:200]
-            print(f"❌ Error: {error_msg}")
-            return f"⚠️ AI service error. Please try again later."
-            
-    except requests.Timeout:
-        print("❌ Timeout")
-        return "⚠️ Request timed out. Please try again."
-    
-    except requests.ConnectionError:
-        print("❌ Connection error")
-        return "⚠️ Cannot connect to AI service. Please check your internet."
-    
     except Exception as e:
-        print(f"❌ Exception: {str(e)}")
-        return f"⚠️ Something went wrong, please try again."
+        error_msg = str(e)
+        print(f"❌ Error: {error_msg}")
+        
+        # Handle specific errors
+        if "401" in error_msg or "authentication" in error_msg.lower():
+            return "⚠️ API authentication failed. Please check your OpenRouter API key."
+        elif "402" in error_msg or "credit" in error_msg.lower():
+            return "⚠️ API credits exhausted. Please add credits to your OpenRouter account."
+        elif "429" in error_msg or "rate limit" in error_msg.lower():
+            return "⚠️ Too many requests. Please wait a moment and try again."
+        elif "timeout" in error_msg.lower():
+            return "⚠️ Request timed out. Please try again."
+        else:
+            return f"⚠️ Something went wrong, please try again."
 
 
 @app.route('/')
@@ -199,8 +174,9 @@ def test_api():
     return jsonify({
         'status': 'ok',
         'site_url': SITE_URL,
-        'api_key_prefix': OPENAI_API_KEY[:20],
-        'model': 'meta-llama/llama-3.1-8b-instruct:free'
+        'api_key_set': bool(OPENAI_API_KEY),
+        'api_key_prefix': OPENAI_API_KEY[:20] if OPENAI_API_KEY else None,
+        'model': 'openai/gpt-4o-mini'
     })
 
 if __name__ == '__main__':
@@ -619,8 +595,8 @@ if __name__ == '__main__':
     print("=" * 60)
     print(f"🌐 Local: http://localhost:5000")
     print(f"🌐 Deployed: {SITE_URL}")
-    print(f"🔑 API Key: {OPENAI_API_KEY[:20]}...")
-    print(f"🤖 Model: meta-llama/llama-3.1-8b-instruct:free")
+    print(f"🔑 API Key: {OPENAI_API_KEY[:20] if OPENAI_API_KEY else 'NOT SET'}...")
+    print(f"🤖 Model: openai/gpt-4o-mini")
     print(f"💾 Chat History: {CHAT_HISTORY_FILE}")
     print(f"🧪 Test Endpoint: {SITE_URL}/api/test")
     print("=" * 60)
