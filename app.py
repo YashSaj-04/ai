@@ -3,14 +3,18 @@ import json
 import os
 from datetime import datetime
 import requests
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 
-# Configuration - Hardcoded
-OPENAI_API_KEY = "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"
+# Configuration - From .env file
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 CHAT_HISTORY_FILE = "chat_history.json"
-SITE_URL = "https://ai-1-itlj.onrender.com"
+SITE_URL = os.getenv("SITE_URL", "https://ai-1-itlj.onrender.com")
 
 # Emergency keywords
 EMERGENCY_KEYWORDS = [
