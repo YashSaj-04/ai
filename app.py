@@ -76,13 +76,13 @@ Keep responses short and conversational like a real chatbot, ask next question i
         headers = {
     "Authorization": f"Bearer {OPENAI_API_KEY}",
     "Content-Type": "application/json",
-    "HTTP-Referer": "https://ai-1-itlj.onrender.com",
+    "Referer": "https://ai-1-itlj.onrender.com",
     "X-Title": "Healthcare Assistant"
 }
 
 
         payload = {
-            "model": "gpt-4o-mini",
+            "model": "openai/gpt-4o-mini",
             "messages": messages,
             "temperature": 0.7,
             "max_tokens": 400
@@ -94,7 +94,10 @@ Keep responses short and conversational like a real chatbot, ask next question i
             data = response.json()
             return data["choices"][0]["message"]["content"].strip()
         else:
-            print("OpenRouter Error:", response.text)
+            print("Status:", response.status_code)
+            print("Headers:", response.headers)
+            print("Body:", response.text)
+
             return "⚠️ I'm having trouble connecting to AI service right now."
     except Exception as e:
         print("Exception:", e)
@@ -586,4 +589,5 @@ if __name__ == '__main__':
     
 
     app.run(debug=True, host='0.0.0.0', port=5000)
+
 
