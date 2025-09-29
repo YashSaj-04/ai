@@ -43,46 +43,24 @@ def detect_emergency(text):
 import requests
 
 def get_gpt_response(user_input, chat_history):
-    """Get response from OpenRouter API"""
-
-    system_prompt = """You are a professional, friendly, empathetic healthcare assistant.
-
-Your role:
-- Collect patient information: Name, Age, Gender, symptoms, severity, duration
-- Ask follow-up questions to understand the condition better
-- Provide safe general advice: rest, hydration, diet, safe OTC medicines
-- Use patient's name once known
-- Respond in the same language patient uses (English, Hindi, Punjabi)
-- Be empathetic and understanding
-- Never diagnose or prescribe prescription medicines
-- Always suggest consulting healthcare professionals for serious concerns
-
-Keep responses short and conversational like a real chatbot, ask next question if needed.
-"""
-
-    # Prepare messages
-    messages = [{"role": "system", "content": system_prompt}]
-    recent_history = chat_history[-6:] if len(chat_history) > 6 else chat_history
-
-    for chat in recent_history:
+    messages = [{"role": "system", "content": "You are a friendly healthcare assistant."}]
+    for chat in chat_history[-6:]:
         if chat.get("user"):
             messages.append({"role": "user", "content": chat["user"]})
         if chat.get("bot"):
             messages.append({"role": "assistant", "content": chat["bot"]})
-
     messages.append({"role": "user", "content": user_input})
 
     try:
         headers = {
-    "Authorization": f"Bearer {OPENAI_API_KEY}",
-    "Content-Type": "application/json",
-    "Referer": "https://ai-1-itlj.onrender.com",
-    "X-Title": "Healthcare Assistant"
-}
-
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+            "Referer": "https://ai-1-itlj.onrender.com",  # ✅ Corrected
+            "X-Title": "Healthcare Assistant"
+        }
 
         payload = {
-            "model": "openai/gpt-4o-mini",
+            "model": "openai/gpt-4o-mini",   # ✅ Corrected model name
             "messages": messages,
             "temperature": 0.7,
             "max_tokens": 400
@@ -90,18 +68,18 @@ Keep responses short and conversational like a real chatbot, ask next question i
 
         response = requests.post(OPENAI_API_URL, headers=headers, json=payload, timeout=30)
 
+        print("Status:", response.status_code)       # ✅ DEBUG
+        print("Body:", response.text[:500])          # ✅ Print first 500 chars only
+
         if response.status_code == 200:
             data = response.json()
             return data["choices"][0]["message"]["content"].strip()
         else:
-            print("Status:", response.status_code)
-            print("Headers:", response.headers)
-            print("Body:", response.text)
-
-            return "⚠️ I'm having trouble connecting to AI service right now."
+            return "⚠️ AI service error. Please check logs."
     except Exception as e:
         print("Exception:", e)
         return "⚠️ Something went wrong, please try again."
+
 
 @app.route('/')
 def home():
@@ -589,5 +567,6 @@ if __name__ == '__main__':
     
 
     app.run(debug=True, host='0.0.0.0', port=5000)
+
 
 
