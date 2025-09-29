@@ -74,11 +74,12 @@ Keep responses short and conversational like a real chatbot, ask next question i
 
     try:
         headers = {
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://ai-1-itlj.onrender.com",  # replace with your domain if deployed
-            "X-Title": "Healthcare Assistant"
-        }
+    "Authorization": f"Bearer {OPENAI_API_KEY}",
+    "Content-Type": "application/json",
+    "HTTP-Referer": "https://ai-1-itlj.onrender.com",
+    "X-Title": "Healthcare Assistant"
+}
+
 
         payload = {
             "model": "gpt-4o-mini",
@@ -585,3 +586,4 @@ if __name__ == '__main__':
     
 
     app.run(debug=True, host='0.0.0.0', port=5000)
+
