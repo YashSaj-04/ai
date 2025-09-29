@@ -2,14 +2,15 @@ from flask import Flask, render_template, request, jsonify
 import json
 import os
 from datetime import datetime
-import openai
+import requests
 
 app = Flask(__name__)
 
-# Configuration - Your OpenAI API Key
-OPENAI_API_KEY = "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"
+# Configuration - Hardcoded
+OPENAI_API_KEY = "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"
 OPENAI_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 CHAT_HISTORY_FILE = "chat_history.json"
+SITE_URL = "https://ai-1-itlj.onrender.com"
 
 # Emergency keywords
 EMERGENCY_KEYWORDS = [
@@ -40,45 +41,84 @@ def detect_emergency(text):
     """Check if message contains emergency keywords"""
     return any(keyword.lower() in text.lower() for keyword in EMERGENCY_KEYWORDS)
 
-import requests
-
 def get_gpt_response(user_input, chat_history):
-    messages = [{"role": "system", "content": "You are a friendly healthcare assistant."}]
+    """Get response from OpenRouter API with better error handling"""
+    messages = [{"role": "system", "content": "You are a friendly healthcare assistant who can speak English, Hindi, and Punjabi. Provide helpful health advice but always remind users to consult doctors for serious issues. Keep responses concise and caring."}]
+    
+    # Add last 6 messages for context
     for chat in chat_history[-6:]:
         if chat.get("user"):
             messages.append({"role": "user", "content": chat["user"]})
         if chat.get("bot"):
             messages.append({"role": "assistant", "content": chat["bot"]})
+    
     messages.append({"role": "user", "content": user_input})
 
     try:
         headers = {
             "Authorization": f"Bearer {OPENAI_API_KEY}",
             "Content-Type": "application/json",
-            "Referer": "https://ai-1-itlj.onrender.com",  # ✅ Corrected
+            "HTTP-Referer": SITE_URL,
             "X-Title": "Healthcare Assistant"
         }
 
         payload = {
-            "model": "openai/gpt-4o-mini",   # ✅ Corrected model name
+            "model": "meta-llama/llama-3.1-8b-instruct:free",
             "messages": messages,
             "temperature": 0.7,
             "max_tokens": 400
         }
 
-        response = requests.post(OPENAI_API_URL, headers=headers, json=payload, timeout=30)
+        print(f"🔄 Sending request to OpenRouter...")
+        print(f"🌐 Site: {SITE_URL}")
+        print(f"🔑 Key: {OPENAI_API_KEY[:20]}...")
+        
+        response = requests.post(
+            OPENAI_API_URL, 
+            headers=headers, 
+            json=payload, 
+            timeout=30
+        )
 
-        print("Status:", response.status_code)       # ✅ DEBUG
-        print("Body:", response.text[:500])          # ✅ Print first 500 chars only
+        print(f"📊 Status: {response.status_code}")
+        print(f"📝 Response: {response.text[:500]}")
 
         if response.status_code == 200:
             data = response.json()
             return data["choices"][0]["message"]["content"].strip()
+        
+        elif response.status_code == 401:
+            print("❌ Invalid API Key")
+            return "⚠️ API authentication failed. Please check your OpenRouter API key."
+        
+        elif response.status_code == 402:
+            print("❌ No credits")
+            return "⚠️ API credits exhausted. Please add credits to your OpenRouter account."
+        
+        elif response.status_code == 429:
+            print("❌ Rate limit")
+            return "⚠️ Too many requests. Please wait a moment and try again."
+        
         else:
-            return "⚠️ AI service error. Please check logs."
+            try:
+                error_data = response.json()
+                error_msg = error_data.get("error", {}).get("message", response.text[:200])
+            except:
+                error_msg = response.text[:200]
+            print(f"❌ Error: {error_msg}")
+            return f"⚠️ AI service error. Please try again later."
+            
+    except requests.Timeout:
+        print("❌ Timeout")
+        return "⚠️ Request timed out. Please try again."
+    
+    except requests.ConnectionError:
+        print("❌ Connection error")
+        return "⚠️ Cannot connect to AI service. Please check your internet."
+    
     except Exception as e:
-        print("Exception:", e)
-        return "⚠️ Something went wrong, please try again."
+        print(f"❌ Exception: {str(e)}")
+        return f"⚠️ Something went wrong, please try again."
 
 
 @app.route('/')
@@ -96,7 +136,7 @@ def chat():
         if not user_message:
             return jsonify({'error': 'Message cannot be empty'}), 400
         
-        print(f"Received message: {user_message}")  # Debug log
+        print(f"💬 User: {user_message}")
         
         # Load chat history
         chat_history = load_chat_history()
@@ -105,12 +145,12 @@ def chat():
         is_emergency = detect_emergency(user_message)
         
         if is_emergency:
-            bot_response = "🚨 This may be an emergency. Please seek urgent medical help immediately by calling emergency services or going to the nearest hospital!"
+            bot_response = "🚨 This may be an emergency! Please seek urgent medical help immediately:\n\n📞 Call 102 (Ambulance)\n📞 Call 108 (Emergency)\n🏥 Visit nearest hospital\n\nYour safety is the priority!"
         else:
             # Get AI response
             bot_response = get_gpt_response(user_message, chat_history)
         
-        print(f"Bot response: {bot_response}")  # Debug log
+        print(f"🤖 Bot: {bot_response[:100]}...")
         
         # Create chat entry
         chat_entry = {
@@ -131,7 +171,7 @@ def chat():
         })
         
     except Exception as e:
-        print(f"Chat error: {e}")  # Debug log
+        print(f"❌ Chat error: {str(e)}")
         return jsonify({'error': 'Something went wrong. Please try again.'}), 500
 
 @app.route('/api/history')
@@ -148,6 +188,16 @@ def clear_history():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/test', methods=['GET'])
+def test_api():
+    """Test endpoint"""
+    return jsonify({
+        'status': 'ok',
+        'site_url': SITE_URL,
+        'api_key_prefix': OPENAI_API_KEY[:20],
+        'model': 'meta-llama/llama-3.1-8b-instruct:free'
+    })
 
 if __name__ == '__main__':
     # Create templates directory if it doesn't exist
@@ -560,13 +610,15 @@ if __name__ == '__main__':
     with open('templates/index.html', 'w', encoding='utf-8') as f:
         f.write(html_template)
     
+    print("=" * 60)
     print("🏥 Healthcare Assistant Starting...")
-    print("🌐 Open http://localhost:5000")
-    print("✅ OpenAI API configured")
-    print("💾 Local chat storage enabled")
+    print("=" * 60)
+    print(f"🌐 Local: http://localhost:5000")
+    print(f"🌐 Deployed: {SITE_URL}")
+    print(f"🔑 API Key: {OPENAI_API_KEY[:20]}...")
+    print(f"🤖 Model: meta-llama/llama-3.1-8b-instruct:free")
+    print(f"💾 Chat History: {CHAT_HISTORY_FILE}")
+    print(f"🧪 Test Endpoint: {SITE_URL}/api/test")
+    print("=" * 60)
     
-
     app.run(debug=True, host='0.0.0.0', port=5000)
-
-
-
