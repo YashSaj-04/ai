@@ -76,7 +76,7 @@ Keep responses short and conversational like a real chatbot, ask next question i
         headers = {
             "Authorization": f"Bearer {OPENAI_API_KEY}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "http://localhost:5000",  # replace with your domain if deployed
+            "HTTP-Referer": "https://ai-1-itlj.onrender.com",  # replace with your domain if deployed
             "X-Title": "Healthcare Assistant"
         }
 
@@ -583,4 +583,5 @@ if __name__ == '__main__':
     print("✅ OpenAI API configured")
     print("💾 Local chat storage enabled")
     
+
     app.run(debug=True, host='0.0.0.0', port=5000)
